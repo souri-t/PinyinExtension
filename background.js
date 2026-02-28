@@ -68,7 +68,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  // 翻訳リクエスト（content.js から段落テキストを受け取り翻訳して返す）
+  // 翻訳リクエスト（content.js から段落テキストを受け取り文単位で翻訳して返す）
   if (message.type === 'TRANSLATE_PARAGRAPH') {
     const { text, lang } = message;
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=${lang}&dt=t&q=${encodeURIComponent(text)}`;
@@ -76,12 +76,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then((res) => res.json())
       .then((data) => {
         // レスポンス形式: [[[translated, original, ...], ...], ...]
-        const translated = data[0]?.map((item) => item[0] ?? '').join('') ?? '';
-        sendResponse({ translated });
+        // 文単位の配列として返す
+        const sentences = (data[0] ?? [])
+          .filter((item) => item[1])  // 原文のないエントリを除外
+          .map((item) => ({
+            original: item[1],
+            translated: item[0] ?? '',
+          }));
+        sendResponse({ sentences });
       })
       .catch((err) => {
         console.error('[Pinyin Tool] Translation error:', err);
-        sendResponse({ translated: null, error: err.message });
+        sendResponse({ sentences: null, error: err.message });
       });
     return true; // 非同期レスポンス
   }

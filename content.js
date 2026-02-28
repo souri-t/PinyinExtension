@@ -105,14 +105,24 @@
   // ---- 翻訳機能 ----
 
   /**
-   * 要素のテキスト内容から中国語文字数を返す
+   * 要素のテキストを取得する（<rt>タグ内のピンインと翻訳スパンは除外）
    */
-  function countChinese(el) {
-    return (el.textContent.match(CHINESE_GLOBAL_RE) ?? []).length;
+  function getTextWithoutRt(el) {
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('rt').forEach((rt) => rt.remove());
+    clone.querySelectorAll(`[${TRANS_ATTR}]`).forEach((e) => e.remove());
+    return clone.textContent;
   }
 
   /**
-   * 翻訳対象のブロック要素を収集する（翻訳ブロックが未挿入のもの）
+   * 要素のテキスト内容から中国語文字数を返す（ピンイン・翻訳除外）
+   */
+  function countChinese(el) {
+    return (getTextWithoutRt(el).match(CHINESE_GLOBAL_RE) ?? []).length;
+  }
+
+  /**
+   * 翻訳対象のブロック要素を収集する（翻訳スパンが未挿入のもの）
    */
   function collectTranslatableBlocks() {
     const elements = document.body.querySelectorAll(
@@ -128,44 +138,152 @@
   }
 
   /**
-   * 翻訳ブロックを段落の直後に挿入する
+   * ブロック要素内のテキストノードを収集する（rt・翻訳スパン内を除外）
    */
-  function insertTranslationBlock(el, translatedText, lang) {
-    const block = document.createElement('div');
-    block.className = 'pinyin-translation';
-    block.setAttribute(TRANS_ATTR, '1');
-
-    const langLabel = lang === 'ja' ? '🇯🇵 日本語訳' : '🇺🇸 English';
-    block.innerHTML = `<span class="pinyin-translation-label">${langLabel}</span>${translatedText}`;
-
-    el.insertAdjacentElement('afterend', block);
+  function collectVisibleTextNodes(el) {
+    const nodes = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        if (parent.closest('rt')) return NodeFilter.FILTER_REJECT;
+        if (parent.closest(`[${TRANS_ATTR}]`)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    let n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    return nodes;
   }
 
   /**
-   * 翻訳を有効化する（各段落を非同期で翻訳）
+   * 翻訳スパンを1つ作成してブロック末尾に追加する
    */
-  async function enableTranslation(lang) {
-    const blocks = collectTranslatableBlocks();
-    for (const el of blocks) {
-      const text = el.textContent.trim();
-      if (!text) continue;
+  function appendSingleTranslation(el, text) {
+    const span = document.createElement('span');
+    span.className = 'pinyin-trans-inline';
+    span.setAttribute(TRANS_ATTR, '1');
+    span.textContent = text;
+    el.appendChild(span);
+  }
 
-      // ローディング表示
-      const loadingBlock = document.createElement('div');
-      loadingBlock.className = 'pinyin-translation pinyin-translation-loading';
-      loadingBlock.setAttribute(TRANS_ATTR, '1');
-      loadingBlock.textContent = '翻訳中...';
-      el.insertAdjacentElement('afterend', loadingBlock);
+  /**
+   * 翻訳配列をインラインで挿入する
+   * DOM内の句読点（。！？）を順に探し、各句読点の直後に対応する翻訳を挿入する。
+   * translatedParts: string[] — 文ごとの翻訳テキスト配列
+   */
+  function insertInlineTranslations(el, translatedParts) {
+    if (!translatedParts || translatedParts.length === 0) return;
+
+    const DELIMITERS = new Set(['。', '！', '？']);
+    const textNodes = collectVisibleTextNodes(el);
+    let partIdx = 0;
+
+    for (let i = 0; i < textNodes.length && partIdx < translatedParts.length; i++) {
+      let tn = textNodes[i];
+      let text = tn.nodeValue;
+
+      for (let j = 0; j < text.length && partIdx < translatedParts.length; j++) {
+        if (DELIMITERS.has(text[j])) {
+          const splitPos = j + 1; // 句読点の直後
+
+          if (splitPos < text.length) {
+            // テキストノードの途中 → splitText で分割
+            const afterNode = tn.splitText(splitPos);
+            const span = document.createElement('span');
+            span.className = 'pinyin-trans-inline';
+            span.setAttribute(TRANS_ATTR, '1');
+            span.textContent = translatedParts[partIdx];
+            tn.parentNode.insertBefore(span, afterNode);
+            partIdx++;
+            // 分割後のノードで再スキャン
+            tn = afterNode;
+            text = tn.nodeValue;
+            j = -1; // for ループの j++ で 0 になる
+          } else {
+            // テキストノードの末尾 → ruby 内なら ruby の後に挿入
+            const insertAfter =
+              tn.parentElement?.closest(`ruby[${ATTR}]`) || tn;
+            const span = document.createElement('span');
+            span.className = 'pinyin-trans-inline';
+            span.setAttribute(TRANS_ATTR, '1');
+            span.textContent = insertAfter.parentNode
+              ? translatedParts[partIdx]
+              : translatedParts[partIdx];
+            insertAfter.parentNode.insertBefore(span, insertAfter.nextSibling);
+            partIdx++;
+          }
+        }
+      }
+    }
+
+    // 残りの翻訳（句読点が見つからなかった分）→ ブロック末尾に追加
+    for (let i = partIdx; i < translatedParts.length; i++) {
+      appendSingleTranslation(el, translatedParts[i]);
+    }
+  }
+
+  /**
+   * 翻訳を有効化する
+   * 各ブロック要素のテキストを句読点（。！？）で分割し、
+   * 改行区切りでAPIに送信。応答を改行で分割して文ごとにインライン挿入する。
+   */
+  function enableTranslation(lang) {
+    const blocks = collectTranslatableBlocks();
+    const SENTENCE_SPLIT_RE = /(?<=[。！？])/;
+
+    for (const el of blocks) {
+      // <rt>・翻訳スパンを除外してテキストを取得
+      const text = getTextWithoutRt(el);
+      if (!text.trim()) continue;
+
+      // 文を句読点で分割
+      const sentenceParts = text.split(SENTENCE_SPLIT_RE).filter((s) => s.trim());
+      const needsSplit = sentenceParts.length > 1;
+
+      // 複数文の場合: 改行区切りで送信（APIが改行を保持するため分割可能）
+      const apiText = needsSplit ? sentenceParts.join('\n') : text;
+
+      // ローディング表示（インライン）
+      const loadingSpan = document.createElement('span');
+      loadingSpan.className = 'pinyin-trans-loading';
+      loadingSpan.setAttribute(TRANS_ATTR, '1');
+      loadingSpan.textContent = ' ⏳';
+      el.appendChild(loadingSpan);
 
       // background.js に翻訳を依頼
       chrome.runtime.sendMessage(
-        { type: 'TRANSLATE_PARAGRAPH', text, lang },
+        { type: 'TRANSLATE_PARAGRAPH', text: apiText, lang },
         (response) => {
-          if (loadingBlock.isConnected) {
-            if (response?.translated) {
-              insertTranslationBlock(el, response.translated, lang);
+          if (chrome.runtime.lastError) {
+            console.warn('[Pinyin Tool] Message error:', chrome.runtime.lastError.message);
+          }
+          // ローディング表示を削除
+          if (loadingSpan.isConnected) loadingSpan.remove();
+
+          if (!response?.sentences) return;
+
+          // API応答の翻訳テキストを結合
+          const fullTranslation = response.sentences
+            .map((s) => s.translated)
+            .join('');
+
+          if (needsSplit) {
+            // 改行で分割して文ごとの翻訳を取得
+            const translatedParts = fullTranslation
+              .split('\n')
+              .filter((s) => s.trim());
+
+            if (translatedParts.length === sentenceParts.length) {
+              // 文数一致 → 句読点位置にインライン挿入
+              insertInlineTranslations(el, translatedParts);
+            } else {
+              // 数不一致 → フォールバック: ブロック末尾に追加
+              appendSingleTranslation(el, fullTranslation.replace(/\n/g, ''));
             }
-            loadingBlock.remove();
+          } else {
+            // 単一文 → ブロック末尾に追加
+            appendSingleTranslation(el, fullTranslation);
           }
         }
       );
@@ -173,21 +291,24 @@
   }
 
   /**
-   * 翻訳ブロックを除去する
+   * 翻訳スパンを除去し、分割されたテキストノードを統合する
    */
   function disableTranslation() {
     document.querySelectorAll(`[${TRANS_ATTR}]`).forEach((el) => el.remove());
+    // splitText で分割されたテキストノードを再結合
+    document.body.normalize();
   }
 
   // ---- メッセージリスナー ----
 
-  chrome.runtime.onMessage.addListener((message) => {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'TOGGLE_PINYIN') {
       if (message.enabled) {
         enablePinyin();
       } else {
         disablePinyin();
       }
+      sendResponse({ success: true });
     }
     if (message.type === 'TOGGLE_TRANSLATION') {
       if (message.enabled) {
@@ -195,6 +316,7 @@
       } else {
         disableTranslation();
       }
+      sendResponse({ success: true });
     }
   });
 
