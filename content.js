@@ -1,8 +1,14 @@
 (() => {
   const ATTR = 'data-pinyin-added';
+  const TRANS_ATTR = 'data-translation-added';
+  // 翻訳対象の最小中国語文字数
+  const MIN_CHINESE_CHARS = 5;
+  // 翻訳対象のブロック要素タグ
+  const BLOCK_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'td', 'th', 'blockquote', 'figcaption', 'dt', 'dd']);
 
   // 中国語文字を含むかチェック（CJK統合漢字）
   const CHINESE_RE = /[\u4e00-\u9fff\u3400-\u4dbf\u{20000}-\u{2a6df}\u{2a700}-\u{2b73f}]/u;
+  const CHINESE_GLOBAL_RE = /[\u4e00-\u9fff\u3400-\u4dbf]/gu;
 
   /**
    * テキストを中国語と非中国語のセグメントに分割する
@@ -94,7 +100,85 @@
     document.body.normalize();
   }
 
-  // バックグラウンドスクリプトからのメッセージを受信
+  // ---- 翻訳機能 ----
+
+  /**
+   * 要素のテキスト内容から中国語文字数を返す
+   */
+  function countChinese(el) {
+    return (el.textContent.match(CHINESE_GLOBAL_RE) ?? []).length;
+  }
+
+  /**
+   * 翻訳対象のブロック要素を収集する（翻訳ブロックが未挿入のもの）
+   */
+  function collectTranslatableBlocks() {
+    const elements = document.body.querySelectorAll(
+      Array.from(BLOCK_TAGS).join(',')
+    );
+    return Array.from(elements).filter((el) => {
+      // 既に翻訳済み、または翻訳ブロック自身はスキップ
+      if (el.closest(`[${TRANS_ATTR}]`) || el.querySelector(`[${TRANS_ATTR}]`)) return false;
+      // script/style 内はスキップ
+      if (el.closest('script, style, noscript')) return false;
+      return countChinese(el) >= MIN_CHINESE_CHARS;
+    });
+  }
+
+  /**
+   * 翻訳ブロックを段落の直後に挿入する
+   */
+  function insertTranslationBlock(el, translatedText, lang) {
+    const block = document.createElement('div');
+    block.className = 'pinyin-translation';
+    block.setAttribute(TRANS_ATTR, '1');
+
+    const langLabel = lang === 'ja' ? '🇯🇵 日本語訳' : '🇺🇸 English';
+    block.innerHTML = `<span class="pinyin-translation-label">${langLabel}</span>${translatedText}`;
+
+    el.insertAdjacentElement('afterend', block);
+  }
+
+  /**
+   * 翻訳を有効化する（各段落を非同期で翻訳）
+   */
+  async function enableTranslation(lang) {
+    const blocks = collectTranslatableBlocks();
+    for (const el of blocks) {
+      const text = el.textContent.trim();
+      if (!text) continue;
+
+      // ローディング表示
+      const loadingBlock = document.createElement('div');
+      loadingBlock.className = 'pinyin-translation pinyin-translation-loading';
+      loadingBlock.setAttribute(TRANS_ATTR, '1');
+      loadingBlock.textContent = '翻訳中...';
+      el.insertAdjacentElement('afterend', loadingBlock);
+
+      // background.js に翻訳を依頼
+      chrome.runtime.sendMessage(
+        { type: 'TRANSLATE_PARAGRAPH', text, lang },
+        (response) => {
+          if (loadingBlock.isConnected) {
+            if (response?.translated) {
+              insertTranslationBlock(el, response.translated, lang);
+            }
+            loadingBlock.remove();
+          }
+        }
+      );
+    }
+  }
+
+  /**
+   * 翻訳ブロックを除去する
+   */
+  function disableTranslation() {
+    document.querySelectorAll(`[${TRANS_ATTR}]`).forEach((el) => el.remove());
+  }
+
+  // ---- メッセージリスナー ----
+
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'TOGGLE_PINYIN') {
       if (message.enabled) {
@@ -103,12 +187,21 @@
         disablePinyin();
       }
     }
+    if (message.type === 'TOGGLE_TRANSLATION') {
+      if (message.enabled) {
+        enableTranslation(message.lang);
+      } else {
+        disableTranslation();
+      }
+    }
   });
 
   // ページ読み込み時に保存済みの状態を確認して適用
-  chrome.storage.local.get('pinyinEnabled', ({ pinyinEnabled }) => {
-    if (pinyinEnabled) {
-      enablePinyin();
+  chrome.storage.local.get(
+    ['pinyinEnabled', 'translateEnabled', 'translateLang'],
+    ({ pinyinEnabled, translateEnabled, translateLang }) => {
+      if (pinyinEnabled) enablePinyin();
+      if (translateEnabled) enableTranslation(translateLang ?? 'ja');
     }
-  });
+  );
 })();

@@ -1,22 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "中国語拼音ツール",
-  "version": "1.0.0",
-  "description": "Webページの中国語テキストに拼音（ピンイン）を付与します",
+  "name": "中国語拼音・翻訳ツール",
+  "version": "1.1.0",
+  "description": "Webページの中国語テキストに拼音（ピンイン）の付与と日本語/英語翻訳を行います",
   "permissions": [
     "storage",
     "activeTab",
     "scripting"
   ],
   "host_permissions": [
-    "*://*/*"
+    "*://*/*",
+    "https://translate.googleapis.com/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "中国語拼音ツール"
+    "default_title": "中国語拼音・翻訳ツール"
   },
   "content_scripts": [
     {
