@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "中国語拼音ツール",
+  "version": "1.0.0",
+  "description": "Webページの中国語テキストに拼音（ピンイン）を付与します",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "中国語拼音ツール"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["lib/pinyin-pro.js", "content.js"],
+      "css": ["style.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
