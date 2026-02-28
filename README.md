@@ -2,12 +2,10 @@
 
 Webページ上の中国語テキストに、声調記号付きの拼音（ピンイン）の付与と、段落ごとの日本語/英語翻訳表示を行うChrome拡張機能です。
 
-```
-     nǐ   hǎo   shì   jiè
-     你    好    世    界
-─────────────────────────────
-🇯🇵 日本語訳  こんにちは、世界
-```
+
+![イメージ](https://private-user-images.githubusercontent.com/14244767/556443404-b6624ce6-fdee-49e8-9d36-ef10d7b7f52e.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzIzMDUxMjksIm5iZiI6MTc3MjMwNDgyOSwicGF0aCI6Ii8xNDI0NDc2Ny81NTY0NDM0MDQtYjY2MjRjZTYtZmRlZS00OWU4LTlkMzYtZWYxMGQ3YjdmNTJlLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAyMjglMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMjI4VDE4NTM0OVomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTAyMDIwOTlhNTFlZDlhNjRiYjhjZjkzZGU1YmY3MzFhZjQ5OGU5MDdhYzE1ZWNjOTU3NmM3MzhlMjI4NTUzN2EmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.JwI7_QgSBP8OJ0KRwP4VsbOpJBJ3rjOO3S1in_5I1q4)
+
+
 
 ---
 
@@ -15,9 +13,7 @@ Webページ上の中国語テキストに、声調記号付きの拼音（ピ�
 
 - 🔤 **拼音の自動付与** — ページ内の中国語（漢字）の真上に声調記号付き拼音を表示
 - 🌐 **段落ごとの翻訳** — 中国語の各段落の直下に翻訳結果を表示（日本語 / 英語を選択可能）
-- 🔴 **見やすいスタイル** — 拼音は赤色のルビ、翻訳は左ボーダー付きブロックで表示
-- 🔁 **独立した ON/OFF** — 拼音・翻訳それぞれ個別にトグル可能
-- 📴 **拼音はオフライン動作** — 拼音変換はローカルライブラリで完結（外部通信なし）
+- 📴 **オフライン動作** — 拼音変換はローカルライブラリで完結（外部通信なし）
 
 ---
 
@@ -53,6 +49,11 @@ git clone <このリポジトリのURL>
 | **拼音を表示** | ONにするとすべての中国語文字の上に拼音が表示される |
 | **翻訳を表示** | ONにすると中国語の段落直下に翻訳ブロックが表示される |
 | **翻訳先言語** | 🇯🇵 日本語 または 🇺🇸 English を選択 |
+
+
+
+<img src="https://private-user-images.githubusercontent.com/14244767/556443392-c49d426c-fb1e-4f1f-907a-2498a8e4d6e3.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzIzMDQ3OTgsIm5iZiI6MTc3MjMwNDQ5OCwicGF0aCI6Ii8xNDI0NDc2Ny81NTY0NDMzOTItYzQ5ZDQyNmMtZmIxZS00ZjFmLTkwN2EtMjQ5OGE4ZTRkNmUzLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAyMjglMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMjI4VDE4NDgxOFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTI3NmRjYzM1NDFmMTdiZWY2YzQyYmNkMjViZGY5NTFkMmMzYzE1MmE4NGM2ZjhmZTBiNmI1YjdhMzJiYTlhNzAmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.mkengmoC_BaTD_uSi6sSxqoWrAkz-OfOMCKTrHbDAGs" width= "300px" >
+
 
 ---
 
