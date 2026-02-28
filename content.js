@@ -73,6 +73,8 @@
           if (['script', 'style', 'noscript', 'textarea', 'input'].includes(tag)) {
             return NodeFilter.FILTER_REJECT;
           }
+          // 翻訳ブロック内はスキップ
+          if (parent.closest(`[${TRANS_ATTR}]`)) return NodeFilter.FILTER_REJECT;
           if (parent.closest(`[${ATTR}]`)) return NodeFilter.FILTER_REJECT;
           return NodeFilter.FILTER_ACCEPT;
         },

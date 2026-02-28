@@ -1,13 +1,37 @@
 const STORAGE_KEY = 'pinyinEnabled';
 
-// 初期状態を false に設定
+// 初期状態を設定（既存の値は上書きしない）
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.set({
-    [STORAGE_KEY]: false,
-    translateEnabled: false,
-    translateLang: 'ja',
+  chrome.storage.local.get(['pinyinEnabled', 'translateEnabled', 'translateLang'], (result) => {
+    const defaults = {};
+    if (result.pinyinEnabled === undefined) defaults.pinyinEnabled = false;
+    if (result.translateEnabled === undefined) defaults.translateEnabled = false;
+    if (result.translateLang === undefined) defaults.translateLang = 'ja';
+    if (Object.keys(defaults).length > 0) {
+      chrome.storage.local.set(defaults);
+    }
   });
 });
+
+/**
+ * タブに Chrome メッセージを送信する。
+ * 拡張機能の再読み込み後など content.js が失われている場合は
+ * scripting.executeScript で再注入してからリトライする。
+ */
+function sendToTab(tabId, message) {
+  chrome.tabs.sendMessage(tabId, message, (response) => {
+    if (chrome.runtime.lastError) {
+      // content.js が未注入（ページをまたいだ再読み込みなど）→ 再注入してリトライ
+      chrome.scripting.executeScript(
+        { target: { tabId }, files: ['lib/pinyin-pro.js', 'content.js'] },
+        () => {
+          if (chrome.runtime.lastError) return; // 注入不可ページ（chrome:// 等）
+          chrome.tabs.sendMessage(tabId, message);
+        }
+      );
+    }
+  });
+}
 
 // ポップアップからのメッセージを受け取り処理する
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -16,10 +40,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.storage.local.set({ [STORAGE_KEY]: message.enabled }, () => {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'TOGGLE_PINYIN',
-            enabled: message.enabled,
-          });
+          sendToTab(tabs[0].id, { type: 'TOGGLE_PINYIN', enabled: message.enabled });
         }
       });
       sendResponse({ success: true });
@@ -34,7 +55,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       () => {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, {
+            sendToTab(tabs[0].id, {
               type: 'TOGGLE_TRANSLATION',
               enabled: message.enabled,
               lang: message.lang,
