@@ -22,7 +22,7 @@ Webページ上の中国語テキストに、声調記号付きの拼音（ピ�
 ### 1. リポジトリをクローン（またはダウンロード）
 
 ```bash
-git clone <このリポジトリのURL>
+git clone https://github.com/souri-t/PinyinExtension.git
 ```
 
 ### 2. Chrome に拡張機能を読み込む
